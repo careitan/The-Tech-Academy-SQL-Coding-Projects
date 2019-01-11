@@ -119,18 +119,37 @@ WITH A (BookID, NumCopies) AS
 	SELECT (ABS(CHECKSUM(NEWID()))%21 + 1000), (ABS(CHECKSUM(NEWID()))%6 + 2)
 )
 INSERT INTO BOOK_COPIES
-( BranchID, BookID, Number_Of_Copies)
+( BranchID, BookID)
+/*
 SELECT 5000, BookID, NumCopies FROM A UNION
 SELECT 5001, BookID, NumCopies FROM A UNION
 SELECT 5002, BookID, NumCopies FROM A UNION
 SELECT 5003, BookID, NumCopies FROM A UNION
 SELECT 5004, BookID, NumCopies FROM A;
+*/
+SELECT 5000, BookID FROM A UNION
+SELECT 5001, BookID FROM A UNION
+SELECT 5002, BookID FROM A UNION
+SELECT 5003, BookID FROM A UNION
+SELECT 5004, BookID FROM A;
 
 /* Ensure that certain books are populated specifically at locations per the testing requirements. */
 /* "The Lost Tribe" is at least located at the "Sharpstown" Branch */
-
 INSERT INTO BOOK_COPIES
-( BookID, BranchID, Number_Of_Copies )
+( BookID, BranchID )
+SELECT B.BookID, LB.BranchID FROM BOOKS B INNER JOIN BOOK_COPIES BC ON
+	B.BookID = BC.BookID INNER JOIN LIBRARY_BRANCH LB ON
+	BC.BranchID = LB.BranchID
+WHERE B.Title = 'The Lost Tribe' AND LB.BranchName = 'Sharpstown';
+
+/* Put at least two books written by Stephen King at the Central Branch */
+INSERT INTO BOOK_COPIES
+( BookID, BranchID )
+SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_COPIES BC ON
+	B.BookID = BC.BookID INNER JOIN LIBRARY_BRANCH LB ON
+	BC.BranchID = LB.BranchID
+WHERE B.AuthorName = 'Stephen King' AND LB.BranchName = 'Central';
+
 
 
 /* Final Population of the Book Loans Table */
