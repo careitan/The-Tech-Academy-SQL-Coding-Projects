@@ -1,3 +1,89 @@
+/* The Tech Academy - SQL Library System project All-in-One Build
+/  Author:  Allan Reitan
+/  Based on combination of seperate TSQL Scripts to automate the Build, Insert, and SPROCS
+/  For use with MS SQL Server version 2014 or newer
+/ -------------------------------------------------------
+/
+/	BUILD DB AND TABLE STRUCTURE
+/
+/ -------------------------------------------------------*/
+
+USE master
+IF EXISTS(select * from sys.databases where name='db_Library')
+DROP DATABASE db_Library
+
+CREATE DATABASE db_Library;
+GO
+
+USE [db_Library]
+
+IF OBJECT_ID('dbo.BOOK_LOANS', 'U') IS NOT NULL
+	DROP TABLE BOOK_LOANS, BOOK_COPIES, BORROWER, LIBRARY_BRANCH, BOOK_AUTHORS, BOOKS, PUBLISHER;
+GO
+
+CREATE TABLE PUBLISHER
+(
+	PublisherName varchar(128) PRIMARY KEY NOT NULL
+	,Address varchar(128) NOT NULL
+	,Phone varchar(24) NOT NULL
+);
+
+CREATE TABLE BOOKS
+(
+	BookID INT PRIMARY KEY NOT NULL IDENTITY(1000,1)
+	,Title varchar(250) NOT NULL
+	,PublisherName varchar(128) NOT NULL CONSTRAINT fk_Publisher_Books FOREIGN KEY REFERENCES PUBLISHER(PublisherName) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+CREATE TABLE BOOK_AUTHORS
+(
+	BookID INT CONSTRAINT fk_Books_BookAuthors FOREIGN KEY REFERENCES BOOKS(BookID) ON UPDATE CASCADE ON DELETE CASCADE
+	,AuthorName varchar(64) NOT NULL
+);
+
+CREATE TABLE LIBRARY_BRANCH
+(
+	BranchID INT PRIMARY KEY NOT NULL IDENTITY(5000,1)
+	,BranchName varchar(128) NOT NULL
+	,Address varchar(128) NOT NULL
+);
+
+CREATE TABLE BORROWER
+(
+	CardNo INT PRIMARY KEY NOT NULL IDENTITY(1,1)
+	,Name varchar(128) NOT NULL
+	,Address varchar(128) NOT NULL
+	,Phone varchar(24) NOT NULL
+);
+
+CREATE TABLE BOOK_COPIES
+(
+	BookID INT NOT NULL CONSTRAINT fk_Books_BookCopies FOREIGN KEY REFERENCES BOOKS(BookID) ON UPDATE CASCADE ON DELETE CASCADE
+	,BranchID INT NOT NULL CONSTRAINT fk_LibraryBranch_BookCopies FOREIGN KEY REFERENCES LIBRARY_BRANCH(BranchID) ON UPDATE CASCADE ON DELETE CASCADE
+	,Number_Of_Copies INT NOT NULL DEFAULT((ABS(CHECKSUM(NEWID()))%6 + 2))
+	,CONSTRAINT ck_UnsignedIntCopies CHECK (Number_Of_Copies >= 0)
+	,CONSTRAINT uk_BooksBranch UNIQUE(BookID, BranchID)
+);
+
+CREATE TABLE BOOK_LOANS
+(
+	BookID INT NOT NULL CONSTRAINT fk_Books_BookLoans FOREIGN KEY REFERENCES BOOKS(BookID) ON UPDATE CASCADE ON DELETE CASCADE
+	,BranchID INT NOT NULL CONSTRAINT fk_LibraryBranch_BookLoans FOREIGN KEY REFERENCES LIBRARY_BRANCH(BranchID) ON UPDATE CASCADE ON DELETE CASCADE
+	,CardNo INT NOT NULL CONSTRAINT fk_Borrower_BookLoans FOREIGN KEY REFERENCES BORROWER(CardNo) ON UPDATE CASCADE ON DELETE CASCADE
+	,DateOut DATE NOT NULL DEFAULT(GETDATE())
+	,DateDue DATE NOT NULL DEFAULT(DATEADD(d,30,GETDATE()))
+	,CONSTRAINT ck_Valid_DueDate CHECK(DateDue > DateOut)
+);
+
+PRINT 'db_Library has been built';
+GO
+
+/* -------------------------------------------------------
+/
+/	INSERT and POPULATE Data for the exercise questions
+/
+/ -------------------------------------------------------*/
+
 USE [db_Library]
 GO
 
@@ -208,3 +294,64 @@ SELECT
 ,CONVERT(date, DATEADD(d,-1*(ABS(CHECKSUM(NEWID()))%30),GETDATE())) [DateOut]
 FROM nums;
 
+/* -------------------------------------------------------
+/
+/	CREATE VIEWS to Support the SPROCS for the exercise questions
+/
+/ -------------------------------------------------------*/
+BEGIN TRY
+
+DECLARE @sql VARCHAR(MAX) = '', @crlf VARCHAR(2) = CHAR(13) + CHAR(10);
+SELECT @sql = @sql + 'DROP VIEW ' + QUOTENAME(v.TABLE_SCHEMA) + '.' + QUOTENAME(v.TABLE_NAME) +';' + @crlf
+	FROM [db_Library].[INFORMATION_SCHEMA].[VIEWS] v
+	WHERE TABLE_CATALOG = 'db_Library';
+
+PRINT @sql;
+EXEC(@sql);
+
+END TRY
+BEGIN CATCH
+END CATCH
+GO
+
+CREATE VIEW v_BooksByBranch AS
+SELECT B.Title, LB.BranchName, BC.Number_Of_Copies
+FROM BOOKS B INNER JOIN BOOK_COPIES BC ON B.BookID = BC.BookID INNER JOIN
+	LIBRARY_BRANCH LB ON BC.BranchID = LB.BranchID;
+GO
+
+CREATE VIEW v_BorrowerNames AS
+SELECT B.CardNo
+	,B.Name
+	,B.Address
+	,B.Phone
+	,COUNT(BL.BookID)OVER(PARTITION BY BL.CardNo) [NumBooksLoaned]
+	FROM BORROWER B INNER JOIN BOOK_LOANS BL ON B.CardNo = BL.CardNo;
+GO
+
+CREATE VIEW v_BooksLoaned AS
+SELECT 
+	LB.BranchName
+	,BL.BookID
+	,B.Title
+	,BL.DateOut
+	,BL.DateDue
+	,BR.CardNo
+	,BR.Name
+	,BR.Address
+	,BR.Phone
+FROM BOOKS B INNER JOIN BOOK_LOANS BL ON B.BookID = BL.BookID 
+	INNER JOIN LIBRARY_BRANCH LB ON BL.BookID = LB.BranchID
+	RIGHT JOIN BORROWER BR ON BL.CardNo = BR.CardNo
+GO
+
+CREATE VIEW v_AuthorLocations AS
+SELECT 
+	LB.BranchName
+	,B.BookID
+	,B.Title
+	,BA.AuthorName
+FROM BOOKS B INNER JOIN BOOK_COPIES BC ON B.BookID = BC.BookID 
+	INNER JOIN LIBRARY_BRANCH LB ON BC.BookID = LB.BranchID
+	INNER JOIN BOOK_AUTHORS BA ON B.BookID = BA.BookID;
+GO
