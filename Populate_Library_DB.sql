@@ -150,8 +150,27 @@ SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_COPIES BC ON
 	BC.BranchID = LB.BranchID
 WHERE B.AuthorName = 'Stephen King' AND LB.BranchName = 'Central';
 
-
-
 /* Final Population of the Book Loans Table */
 
+DECLARE @BranchRNG INT, @BookRNG INT, @BorrowRNG INT;
+SELECT @BranchRNG = MAX(BranchID) - MIN(BranchID) FROM LIBRARY_BRANCH; 
+SELECT @BookRNG = MAX(BookID) - MIN(BookID) FROM BOOKS;
+SELECT @BorrowRNG = MAX(CardNo) - MIN(CardNo) FROM BORROWER;
+
+WITH nums AS
+(
+   SELECT 1 AS value
+    UNION ALL
+    SELECT value + 1 AS value
+    FROM nums
+    WHERE nums.value <= 99
+)
+INSERT INTO BOOK_LOANS
+( BookID, BranchID, CardNo, DateOut )
+SELECT 
+(ABS(CHECKSUM(NEWID()))%@BookRNG + 1000) [BookID]
+,(ABS(CHECKSUM(NEWID()))%@BranchRNG + 5000) [BranchID]
+,(ABS(CHECKSUM(NEWID()))%@BorrowRNG + 1) [CardNo]
+,CONVERT(date, DATEADD(d,-1*(ABS(CHECKSUM(NEWID()))%30),GETDATE())) [DateOut]
+FROM nums;
 
