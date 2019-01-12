@@ -82,29 +82,38 @@ SELECT 	'The Picture of Dorian Gray'	,	'Dark Winds Press';
 
 /* Baseline Population of the Authors table by matching them up to the corresponding row in the Books table */
 
+WITH A (Title,Author) AS
+(
+	SELECT 'A Tale of Two Cities','Charles Dickens' UNION
+	SELECT 'Animal Farm','George Orwell' UNION
+	SELECT 'Fahrenheit 451','Ray Bradbury' UNION
+	SELECT 'Hamlet','William Shakespeare' UNION
+	SELECT 'Lord of the Flies','William Golding' UNION
+	SELECT 'MacBeth','William Shakespeare' UNION
+	SELECT 'Night','Elie Wiesel' UNION
+	SELECT 'Old Man and the Sea','Ernest Hemingway' UNION
+	SELECT 'The Green Mile','Stephen King' UNION
+	SELECT 'The Hunger Games','Suzanne Collins' UNION
+	SELECT 'The Inferno','Dante' UNION
+	SELECT 'The Legend of Sleepy Hollow','Washington Irving' UNION
+	SELECT 'The Lord of the Rings','J.R.R. Tolkien' UNION
+	SELECT 'The Lost Tribe','Rohen Rale' UNION
+	SELECT 'The Phantom of the Opera','Gaston LeRoux' UNION
+	SELECT 'The Picture of Dorian Gray','Oscar Wilde' UNION
+	SELECT 'The Shawshank Redemption','Stephen King' UNION
+	SELECT 'Three Musketeers','Alexandre Dumas' UNION
+	SELECT 'To Kill a Mockingbird','Harper Lee' UNION
+	SELECT 'Tom Sawyer','Mark Twain' UNION
+	SELECT 'War and Peace','Leo Tolstoy'
+)
 INSERT INTO BOOK_AUTHORS
 ( BookID, AuthorName )
-SELECT 	1000	,	'Rohen Rale' 	UNION
-SELECT 	1001	,	'Stephen King' 	UNION
-SELECT 	1002	,	'Stephen King' 	UNION
-SELECT 	1003	,	'Ernest Hemingway' 	UNION
-SELECT 	1004	,	'Harper Lee' 	UNION
-SELECT 	1005	,	'Suzanne Collins' 	UNION
-SELECT 	1006	,	'Alexandre Dumas' 	UNION
-SELECT 	1007	,	'Dante' 	UNION
-SELECT 	1008	,	'J.R.R. Tolkein' 	UNION
-SELECT 	1009	,	'Ray Bradbury' 	UNION
-SELECT 	1010	,	'George Orwell' 	UNION
-SELECT 	1011	,	'William Golding' 	UNION
-SELECT 	1012	,	'Charles Dickens' 	UNION
-SELECT 	1013	,	'Mark Twain' 	UNION
-SELECT 	1014	,	'William Shakespeare' 	UNION
-SELECT 	1015	,	'William Shakespeare' 	UNION
-SELECT 	1016	,	'Gaston LeRoux' 	UNION
-SELECT 	1017	,	'Washington Irving' 	UNION
-SELECT 	1018	,	'Leo Tolstoy' 	UNION
-SELECT 	1019	,	'Elie Weisel' 	UNION
-SELECT 	1020	,	'Oscar Wilde';
+SELECT 
+	B.BookID
+	,A.Author
+FROM A INNER JOIN [db_Library].[dbo].[BOOKS] B ON
+	A.Title = B.[Title];
+GO
 
 /* Baseline Population of the Copies Table by randomly generating 12 BookIDs to populate at a location */
 
@@ -166,20 +175,18 @@ OUTPUT deleted.*, $action, inserted.* INTO #MyTempTable;
 SELECT * FROM #MyTempTable;
 
 /* Put at least two books written by Stephen King at the Central Branch */
-MERGE BOOK_COPIES AS TARGET
-USING 
-(
-	SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_LOANS BL ON
-		B.BookID = BL.BookID INNER JOIN LIBRARY_BRANCH LB ON
-		BL.BranchID = LB.BranchID
-	WHERE B.AuthorName = 'Stephen King' AND LB.BranchName = 'Central'
-) AS SOURCE
-ON (target.BookID = source.BookID AND target.BranchID = source.BranchID)
-WHEN NOT MATCHED THEN
-INSERT ( BookID, BranchID )
-VALUES (source.BookID, source.BranchID)
-OUTPUT deleted.*, $action, inserted.* INTO #MyTempTable;
-SELECT * FROM #MyTempTable;
+DECLARE @BranchID INT;
+SELECT @BranchID = BranchID FROM LIBRARY_BRANCH WHERE BranchName = 'Central';
+
+INSERT INTO BOOK_COPIES
+( BookID, BranchID )
+SELECT 
+B.BookID
+,@BranchID [BranchID]
+FROM BOOK_AUTHORS BA INNER JOIN BOOKS B ON
+	BA.BookID = B.BookID
+WHERE BA.AuthorName = 'Stephen King' AND B.BookID NOT IN 
+	(SELECT BookID FROM BOOK_COPIES WHERE BranchID = @BranchID);
 
 /* Cleanup Temporary Created Artifact for work */
 DROP TABLE #MyTempTable;
