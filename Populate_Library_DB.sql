@@ -70,7 +70,7 @@ SELECT 	'The Lord of the Rings'	,	'Penguin Books'	UNION
 SELECT 	'Fahrenheit 451'	,	'Penguin Books'	UNION
 SELECT 	'Animal Farm'	,	'Penguin Books'	UNION
 SELECT 	'Lord of the Flies'	,	'Windsor Publishing'	UNION
-SELECT 	'A Tale if Two Cities'	,	'Windsor Publishing'	UNION
+SELECT 	'A Tale of Two Cities'	,	'Windsor Publishing'	UNION
 SELECT 	'Tom Sawyer'	,	'MIT Press'	UNION
 SELECT 	'Hamlet'	,	'Oxford Publishers'	UNION
 SELECT 	'MacBeth'	,	'Oxford Publishers'	UNION
@@ -153,9 +153,9 @@ END CATCH;
 MERGE BOOK_COPIES AS TARGET
 USING 
 (
-	SELECT B.BookID, LB.BranchID FROM BOOKS B INNER JOIN BOOK_COPIES BC ON
-		B.BookID = BC.BookID INNER JOIN LIBRARY_BRANCH LB ON
-		BC.BranchID = LB.BranchID
+	SELECT B.BookID, LB.BranchID FROM BOOKS B INNER JOIN BOOK_LOANS BL ON
+		B.BookID = BL.BookID INNER JOIN LIBRARY_BRANCH LB ON
+		BL.BranchID = LB.BranchID
 	WHERE (B.Title = 'The Lost Tribe' AND LB.BranchName = 'Sharpstown')
 ) AS SOURCE
 ON (target.BookID = source.BookID AND target.BranchID = source.BranchID)
@@ -169,9 +169,9 @@ SELECT * FROM #MyTempTable;
 MERGE BOOK_COPIES AS TARGET
 USING 
 (
-	SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_COPIES BC ON
-		B.BookID = BC.BookID INNER JOIN LIBRARY_BRANCH LB ON
-		BC.BranchID = LB.BranchID
+	SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_LOANS BL ON
+		B.BookID = BL.BookID INNER JOIN LIBRARY_BRANCH LB ON
+		BL.BranchID = LB.BranchID
 	WHERE B.AuthorName = 'Stephen King' AND LB.BranchName = 'Central'
 ) AS SOURCE
 ON (target.BookID = source.BookID AND target.BranchID = source.BranchID)
@@ -208,3 +208,8 @@ SELECT
 ,CONVERT(date, DATEADD(d,-1*(ABS(CHECKSUM(NEWID()))%30),GETDATE())) [DateOut]
 FROM nums;
 
+/* -----------------------------------------------------------------------
+/	ADJUST the DateDue to now be within 30 days of checkout
+/ ------------------------------------------------------------------------*/
+
+UPDATE BOOK_LOANS SET DateDue = DATEADD(d,30, DateOut);

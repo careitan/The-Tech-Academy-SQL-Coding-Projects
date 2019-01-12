@@ -156,7 +156,7 @@ SELECT 	'The Lord of the Rings'	,	'Penguin Books'	UNION
 SELECT 	'Fahrenheit 451'	,	'Penguin Books'	UNION
 SELECT 	'Animal Farm'	,	'Penguin Books'	UNION
 SELECT 	'Lord of the Flies'	,	'Windsor Publishing'	UNION
-SELECT 	'A Tale if Two Cities'	,	'Windsor Publishing'	UNION
+SELECT 	'A Tale of Two Cities'	,	'Windsor Publishing'	UNION
 SELECT 	'Tom Sawyer'	,	'MIT Press'	UNION
 SELECT 	'Hamlet'	,	'Oxford Publishers'	UNION
 SELECT 	'MacBeth'	,	'Oxford Publishers'	UNION
@@ -239,13 +239,13 @@ END CATCH;
 MERGE BOOK_COPIES AS TARGET
 USING 
 (
-	SELECT B.BookID, LB.BranchID FROM BOOKS B INNER JOIN BOOK_COPIES BC ON
-		B.BookID = BC.BookID INNER JOIN LIBRARY_BRANCH LB ON
-		BC.BranchID = LB.BranchID
+	SELECT B.BookID, LB.BranchID FROM BOOKS B INNER JOIN BOOK_LOANS BL ON
+		B.BookID = BL.BookID INNER JOIN LIBRARY_BRANCH LB ON
+		BL.BranchID = LB.BranchID
 	WHERE (B.Title = 'The Lost Tribe' AND LB.BranchName = 'Sharpstown')
 ) AS SOURCE
 ON (target.BookID = source.BookID AND target.BranchID = source.BranchID)
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED BY TARGET THEN
 INSERT ( BookID, BranchID )
 VALUES (source.BookID, source.BranchID)
 OUTPUT deleted.*, $action, inserted.* INTO #MyTempTable;
@@ -255,13 +255,13 @@ SELECT * FROM #MyTempTable;
 MERGE BOOK_COPIES AS TARGET
 USING 
 (
-	SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_COPIES BC ON
-		B.BookID = BC.BookID INNER JOIN LIBRARY_BRANCH LB ON
-		BC.BranchID = LB.BranchID
+	SELECT B.BookID, LB.BranchID FROM BOOK_AUTHORS B INNER JOIN BOOK_LOANS BL ON
+		B.BookID = BL.BookID INNER JOIN LIBRARY_BRANCH LB ON
+		BL.BranchID = LB.BranchID
 	WHERE B.AuthorName = 'Stephen King' AND LB.BranchName = 'Central'
 ) AS SOURCE
 ON (target.BookID = source.BookID AND target.BranchID = source.BranchID)
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED BY TARGET THEN
 INSERT ( BookID, BranchID )
 VALUES (source.BookID, source.BranchID)
 OUTPUT deleted.*, $action, inserted.* INTO #MyTempTable;
@@ -340,8 +340,8 @@ SELECT
 	,BR.Name
 	,BR.Address
 	,BR.Phone
-FROM BOOKS B INNER JOIN BOOK_LOANS BL ON B.BookID = BL.BookID 
-	INNER JOIN LIBRARY_BRANCH LB ON BL.BookID = LB.BranchID
+FROM BOOKS B LEFT JOIN BOOK_LOANS BL ON B.BookID = BL.BookID 
+	FULL JOIN LIBRARY_BRANCH LB ON BL.BranchID = LB.BranchID
 	RIGHT JOIN BORROWER BR ON BL.CardNo = BR.CardNo
 GO
 
@@ -355,3 +355,42 @@ FROM BOOKS B INNER JOIN BOOK_COPIES BC ON B.BookID = BC.BookID
 	INNER JOIN LIBRARY_BRANCH LB ON BC.BookID = LB.BranchID
 	INNER JOIN BOOK_AUTHORS BA ON B.BookID = BA.BookID;
 GO
+
+/* -------------------------------------------------------
+/
+/	CREATE SPROCS and EXEC for the exercise questions
+/
+/ -------------------------------------------------------*/
+BEGIN TRY
+
+	declare @procName varchar(500)
+	declare cur cursor 
+
+	for SELECT [ROUTINE_NAME] FROM [db_Library].[INFORMATION_SCHEMA].[ROUTINES] WHERE [ROUTINE_CATALOG] = 'db_Library';
+	open cur
+	fetch next from cur into @procName
+	while @@fetch_status = 0
+	begin
+		exec('drop procedure [' + @procName + ']')
+		fetch next from cur into @procName
+	end
+	close cur
+	deallocate cur
+
+END TRY
+BEGIN CATCH
+END CATCH
+GO
+
+CREATE PROC usp_SEARCH_CountOfCopiesOfBooks
+	@Title varchar(250) = '%'
+	,@Branch varchar(128) = '%'
+AS
+	SELECT
+		BBB.Number_Of_Copies [Copies]
+		,BBB.Title
+		,BBB.BranchName
+	FROM v_BooksByBranch BBB
+	WHERE BBB.Title LIKE ISNULL(@Title,'%') AND BBB.BranchName LIKE ISNULL(@Branch,'%');
+GO
+

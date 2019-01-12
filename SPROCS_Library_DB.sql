@@ -47,8 +47,8 @@ SELECT
 	,BR.Name
 	,BR.Address
 	,BR.Phone
-FROM BOOKS B INNER JOIN BOOK_LOANS BL ON B.BookID = BL.BookID 
-	INNER JOIN LIBRARY_BRANCH LB ON BL.BookID = LB.BranchID
+FROM BOOKS B LEFT JOIN BOOK_LOANS BL ON B.BookID = BL.BookID 
+	FULL JOIN LIBRARY_BRANCH LB ON BL.BranchID = LB.BranchID
 	RIGHT JOIN BORROWER BR ON BL.CardNo = BR.CardNo
 GO
 
@@ -65,7 +65,38 @@ GO
 
 /* -------------------------------------------------------
 /
-/	CREATE SPROCS and EXEC for the exercise questions
+/	CREATE SPROCS for the exercise questions
 /
 / -------------------------------------------------------*/
+BEGIN TRY
 
+	declare @procName varchar(500)
+	declare cur cursor 
+
+	for SELECT [ROUTINE_NAME] FROM [db_Library].[INFORMATION_SCHEMA].[ROUTINES] WHERE [ROUTINE_CATALOG] = 'db_Library';
+	open cur
+	fetch next from cur into @procName
+	while @@fetch_status = 0
+	begin
+		exec('drop procedure [' + @procName + ']')
+		fetch next from cur into @procName
+	end
+	close cur
+	deallocate cur
+
+END TRY
+BEGIN CATCH
+END CATCH
+GO
+
+CREATE PROC usp_SEARCH_CountOfCopiesOfBooks
+	@Title varchar(250) = '%'
+	,@Branch varchar(128) = '%'
+AS
+	SELECT
+		BBB.Number_Of_Copies [Copies]
+		,BBB.Title
+		,BBB.BranchName
+	FROM v_BooksByBranch BBB
+	WHERE BBB.Title LIKE ISNULL(@Title,'%') AND BBB.BranchName LIKE ISNULL(@Branch,'%');
+GO
