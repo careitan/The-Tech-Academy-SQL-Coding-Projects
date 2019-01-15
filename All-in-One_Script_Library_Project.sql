@@ -110,8 +110,6 @@ WITH A (fname, lname) AS
 	SELECT 'Paul', 'Tuttle' UNION
 	SELECT 'George', 'Anderson' UNION
 	SELECT 'Ringo', 'Davis' UNION
-	SELECT 'Sonja', 'Thompson' UNION
-	SELECT 'Karen', 'Yeager' UNION
 	SELECT 'Tina', 'Jefferson' UNION
 	SELECT 'Lahua', 'Smith' UNION
 	SELECT 'Kawai', 'Jones' UNION
@@ -290,7 +288,7 @@ WITH nums AS
     UNION ALL
     SELECT value + 1 AS value
     FROM nums
-    WHERE nums.value <= 99
+    WHERE nums.value <= 20
 )
 INSERT INTO BOOK_LOANS
 ( BookID, BranchID, CardNo, DateOut )
@@ -299,7 +297,7 @@ SELECT
 ,(ABS(CHECKSUM(NEWID()))%@BranchRNG + 5000) [BranchID]
 ,(ABS(CHECKSUM(NEWID()))%@BorrowRNG + 1) [CardNo]
 ,CONVERT(date, DATEADD(d,-1*(ABS(CHECKSUM(NEWID()))%40),GETDATE())) [DateOut]
-FROM nums;
+FROM nums CROSS JOIN nums n1;
 
 /* -----------------------------------------------------------------------
 /	ADJUST the DateDue to now be within 30 days of checkout
@@ -380,8 +378,6 @@ GO
 /	CREATE SPROCS for the exercise questions
 /
 / -------------------------------------------------------*/
-BEGIN TRY
-
 	declare @procName varchar(500)
 	declare cur cursor 
 
@@ -395,10 +391,6 @@ BEGIN TRY
 	end
 	close cur
 	deallocate cur
-
-END TRY
-BEGIN CATCH
-END CATCH
 GO
 
 CREATE PROC usp_SEARCH_CountOfCopiesOfBooks
@@ -431,7 +423,8 @@ AS
       ,[Name]
       ,[Address]
   FROM [db_Library].[dbo].[v_BooksLoaned]
-  WHERE DateDue = CAST(GETDATE() AS DATE) AND BranchName LIKE ISNULL(@Branch,'%');
+  WHERE DateDue = CAST(GETDATE() AS DATE) AND BranchName LIKE ISNULL(@Branch,'%')
+  ORDER BY BranchName, Title, Name;
 GO
 
 CREATE PROC usp_CountBooksLoanedOut
@@ -442,6 +435,23 @@ AS
       ,COUNT(BookID)OVER(PARTITION BY BranchName) [Count of Books Loaned]
   FROM [db_Library].[dbo].[v_BooksLoaned]
   WHERE BranchName LIKE ISNULL(@Branch,'%');
+GO
+
+CREATE PROC usp_CountBooksLoanedOutByPerson
+	@QtyLoanedOut INT = 0
+AS
+	WITH A
+	AS
+	(
+		SELECT
+			Name
+			,Address
+			,[NumBooksLoaned] = COUNT(BookID)OVER(PARTITION BY CardNo) 
+	  FROM [db_Library].[dbo].[v_BooksLoaned]
+	)
+	SELECT Name, Address, NumBooksLoaned [Count of Books Loaned] FROM A
+	WHERE [NumBooksLoaned] >= ISNULL(@QtyLoanedOut,0)
+	GROUP BY Name, Address, [NumBooksLoaned];
 GO
 
 CREATE PROC usp_SEARCH_AuthorBranch
@@ -458,3 +468,34 @@ AS
 		AuthorName LIKE ISNULL(@Author, '%');
 GO
 
+DECLARE	@return_value int;
+SELECT '1.) How many copies of the book titled "The Lost Tribe" are owned by the library branch whose name is "Sharpstown"?' [Question];
+EXEC	@return_value = [dbo].[usp_SEARCH_CountOfCopiesOfBooks]
+		@Title = 'The Lost Tribe',
+		@Branch = 'SharpsTown';
+
+SELECT '2.) How many copies of the book titled "The Lost Tribe" are owned by each library branch?' [Question];
+EXEC	@return_value = [dbo].[usp_SEARCH_CountOfCopiesOfBooks]
+		@Title = 'The Lost Tribe',
+		@Branch = NULL;
+
+SELECT '3.) Retrieve the names of all borrowers who do not have any books checked out.' [Question];
+EXEC	@return_value = [dbo].[usp_ClearedBorrowsList];
+
+SELECT '4.) For each book that is loaned out from the "Sharpstown" branch and whose DueDate is today, retrieve the book title, the borrower''s name, and the borrower''s address.' [Question];
+EXEC	@return_value = [dbo].[usp_BooksDueToday]
+		@Branch = 'Sharpstown';
+
+SELECT '5.) For each library branch, retrieve the branch name and the total number of books loaned out from that branch.' [Question];
+EXEC	@return_value = [dbo].[usp_BooksDueToday]
+		@Branch = NULL;
+
+SELECT '6.) Retrieve the names, addresses, and the number of books checked out for all borrowers who have more than five books checked out.' [Question];
+EXEC	@return_value = [dbo].[usp_CountBooksLoanedOutByPerson]
+		@QtyLoanedOut = 5;
+
+SELECT '7.) For each book authored (or co-authored) by "Stephen King", retrieve the title and the number of copies owned by the library branch whose name is "Central".' [Question];
+EXEC	@return_value = [dbo].[usp_SEARCH_AuthorBranch]
+		@Branch = 'Central',
+		@Author = 'Stephen King';
+GO

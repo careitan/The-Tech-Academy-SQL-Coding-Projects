@@ -24,8 +24,6 @@ WITH A (fname, lname) AS
 	SELECT 'Paul', 'Tuttle' UNION
 	SELECT 'George', 'Anderson' UNION
 	SELECT 'Ringo', 'Davis' UNION
-	SELECT 'Sonja', 'Thompson' UNION
-	SELECT 'Karen', 'Yeager' UNION
 	SELECT 'Tina', 'Jefferson' UNION
 	SELECT 'Lahua', 'Smith' UNION
 	SELECT 'Kawai', 'Jones' UNION
@@ -204,7 +202,7 @@ WITH nums AS
     UNION ALL
     SELECT value + 1 AS value
     FROM nums
-    WHERE nums.value <= 99
+    WHERE nums.value <= 20
 )
 INSERT INTO BOOK_LOANS
 ( BookID, BranchID, CardNo, DateOut )
@@ -213,7 +211,7 @@ SELECT
 ,(ABS(CHECKSUM(NEWID()))%@BranchRNG + 5000) [BranchID]
 ,(ABS(CHECKSUM(NEWID()))%@BorrowRNG + 1) [CardNo]
 ,CONVERT(date, DATEADD(d,-1*(ABS(CHECKSUM(NEWID()))%30),GETDATE())) [DateOut]
-FROM nums;
+FROM nums CROSS JOIN nums n1;
 
 /* -----------------------------------------------------------------------
 /	ADJUST the DateDue to now be within 30 days of checkout
